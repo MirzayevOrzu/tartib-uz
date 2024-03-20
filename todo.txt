@@ -1,0 +1,14 @@
+- bootstrap styling (done)
+- flash messages (error handling) (done)
+
+- validation flashing (done)
+- password hashing (done)
+- logout post (done)
+- shared/config (done)
+- navigation final fix (dashboard page) (done)
+- not found page (done)
+- stacking flash messages (createGuide, editGuide) (done)
+- promises
+
+- deploying
+- linking domain orzumirzayev.uz
