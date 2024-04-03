@@ -1,15 +1,18 @@
 const express = require("express");
-const { usersDb, guidesDb, todosDb } = require("../db");
+const User = require("../db/User");
+const Guide = require("../db/Guide");
+const Todo = require("../db/Todo");
 
 /**
  * @param {express.Request} req
  * @param {express.Response} res
  */
 function createTodoPage(req, res) {
-  const users = usersDb.findAll();
-  const guides = guidesDb.findAll();
-
-  res.render("todos/create", { users, guides });
+  return Promise.all(User.findAll(), Guide.findAll()).then(
+    ([users, guides]) => {
+      res.render("todos/create", { users, guides });
+    }
+  );
 }
 
 /**
@@ -17,29 +20,29 @@ function createTodoPage(req, res) {
  * @param {express.Response} res
  */
 function createTodo(req, res) {
-  const { user_id, guide_id } = req.body;
+  const { userId, guideId } = req.body;
 
-  const user = usersDb.findById(user_id);
+  return Promise.all(User.findByPk(userId), Guide.findByPk(guideId)).then(
+    ([user, guide]) => {
+      if (!user) {
+        req.flash("error", "Foydalanuvchi topilmadi");
 
-  if (!user) {
-    req.flash("error", "Foydalanuvchi topilmadi");
+        return res.redirect("/todos/create");
+      }
 
-    return res.redirect("/todos/create");
-  }
+      if (!guide) {
+        req.flash("error", "Tartib topilmadi");
 
-  const guide = guidesDb.findById(guide_id);
+        return res.redirect("/todos/create");
+      }
 
-  if (!guide) {
-    req.flash("error", "Tartib topilmadi");
+      return Todo.create({ userId, guideId }).then(() => {
+        req.flash("success", "Bildirishnoma yaratildi");
 
-    return res.redirect("/todos/create");
-  }
-
-  todosDb.create({ user_id, guide_id, completed: false });
-
-  req.flash("success", "Bildirishnoma yaratildi");
-
-  res.redirect("/todos/list");
+        res.redirect("/todos/list");
+      });
+    }
+  );
 }
 
 /**
@@ -47,25 +50,17 @@ function createTodo(req, res) {
  * @param {express.Response} res
  */
 function listTodos(req, res) {
-  const userId = req.user.id;
-
-  const todos = todosDb.findAllOfUser(userId);
-  const guides = guidesDb.findAll();
-
-  const currentUser = usersDb.findById(userId);
-  if (!currentUser) {
-    req.flash("error", "Foydalanuvchi topilmadi");
-    return res.redirect("/todos/list");
-  }
-
-  const guidesMap = new Map(guides.map((guide) => [guide.id, guide]));
-
-  todos.forEach((todo) => {
-    todo.user = currentUser;
-    todo.guide = guidesMap.get(todo.guide_id);
+  return Todo.findAll({
+    where: { userId: req.user.id },
+    include: [
+      { model: User, as: "user" },
+      { model: Guide, as: "guide" },
+    ],
+    raw: true,
+    nest: true,
+  }).then((todos) => {
+    res.render("todos/list", { todos });
   });
-
-  res.render("todos/list", { todos });
 }
 
 /**
@@ -75,24 +70,18 @@ function listTodos(req, res) {
 function showTodo(req, res) {
   const { id } = req.params;
 
-  const todo = todosDb.findById(id);
+  return Todo.findOne({
+    where: { id, userId: req.user.id },
+    include: ["user", "guide"],
+  }).then((todo) => {
+    if (!todo) {
+      req.flash("warning", "Bildirishnoma topilmadi");
 
-  if (!todo) {
-    req.flash("warning", "Bildirishnoma topilmadi");
+      return res.redirect("/todos/list");
+    }
 
-    return res.redirect("/todos/list");
-  }
-
-  if (todo.user_id !== req.user.id) {
-    req.flash("error", "Bildirishnoma sizniki emas");
-
-    return res.redirect("/todos/list");
-  }
-
-  todo.user = usersDb.findById(todo.user_id);
-  todo.guide = guidesDb.findById(todo.guide_id);
-
-  res.render("todos/show", { todo });
+    res.render("todos/show", { todo });
+  });
 }
 
 /**
@@ -102,29 +91,25 @@ function showTodo(req, res) {
 function completeTodo(req, res) {
   const { id } = req.params;
 
-  const todo = todosDb.findById(id);
+  return Todo.findOne({
+    where: { id, userId: req.user.id },
+  }).then((todo) => {
+    if (!todo) {
+      req.flash("error", "Bildirishnoma topilmadi");
 
-  if (!todo) {
-    req.flash("error", "Bildirishnoma topilmadi");
+      return res.redirect("/todos/list");
+    }
 
-    return res.redirect("/todos/list");
-  }
+    if (todo.completed) {
+      req.flash("error", "Bildirishnoma bilan allaqachon tanishib chiqilgan");
 
-  if (todo.user_id !== req.user.id) {
-    req.flash("error", "Bildirishnoma sizniki emas");
+      return res.redirect("/todos/list");
+    }
 
-    return res.redirect("/todos/list");
-  }
-
-  if (todo.completed) {
-    req.flash("error", "Bildirishnoma bilan allaqachon tanishib chiqilgan");
-
-    return res.redirect("/todos/list");
-  }
-
-  todosDb.update(id, { completed: true });
-
-  res.redirect("/todos/list");
+    return todo.update({ completed: true }).then(() => {
+      res.redirect("/todos/list");
+    });
+  });
 }
 
 /**
@@ -134,17 +119,17 @@ function completeTodo(req, res) {
 function removeTodo(req, res) {
   const { id } = req.params;
 
-  const todo = todosDb.findById(id);
+  Todo.findByPk(id).then((todo) => {
+    if (!todo) {
+      req.flash("error", "Bildirishnoma topilmadi");
 
-  if (!todo) {
-    req.flash("error", "Bildirishnoma topilmadi");
+      return res.redirect("/todos/list");
+    }
 
-    return res.redirect("/todos/list");
-  }
-
-  todosDb.remove(id);
-
-  res.redirect("/todos/list");
+    return todo.destroy().then(() => {
+      res.redirect("/todos/list");
+    });
+  });
 }
 
 module.exports = {
