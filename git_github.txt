@@ -1,5 +1,0 @@
-GIT - Version Control System
-Loyihadagi o'zgarishlarni qayd etib borish tizimi
-
-GITHUB - git sistemasi bilan jamoa bo'lib ishlashni 
-imkonini beradigan platforma
