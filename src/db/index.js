@@ -1,12 +1,13 @@
 const { Sequelize } = require("sequelize");
+const config = require("../shared/config");
 
 const db = new Sequelize({
   dialect: "postgres",
-  host: "localhost",
-  port: 5432,
-  database: "erp-guide-n6",
-  username: "postgres",
-  password: "1234",
+  host: config.db.host,
+  port: config.db.port,
+  database: config.db.name,
+  username: config.db.user,
+  password: config.db.pwd,
 });
 
 module.exports = db;
