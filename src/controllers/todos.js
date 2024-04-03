@@ -8,11 +8,12 @@ const Todo = require("../db/Todo");
  * @param {express.Response} res
  */
 function createTodoPage(req, res) {
-  return Promise.all(User.findAll(), Guide.findAll()).then(
-    ([users, guides]) => {
-      res.render("todos/create", { users, guides });
-    }
-  );
+  return Promise.all([
+    User.findAll({ raw: true }),
+    Guide.findAll({ raw: true }),
+  ]).then(([users, guides]) => {
+    res.render("todos/create", { users, guides });
+  });
 }
 
 /**
@@ -22,27 +23,28 @@ function createTodoPage(req, res) {
 function createTodo(req, res) {
   const { userId, guideId } = req.body;
 
-  return Promise.all(User.findByPk(userId), Guide.findByPk(guideId)).then(
-    ([user, guide]) => {
-      if (!user) {
-        req.flash("error", "Foydalanuvchi topilmadi");
+  return Promise.all([
+    User.findByPk(userId, { raw: true }),
+    Guide.findByPk(guideId, { raw: true }),
+  ]).then(([user, guide]) => {
+    if (!user) {
+      req.flash("error", "Foydalanuvchi topilmadi");
 
-        return res.redirect("/todos/create");
-      }
-
-      if (!guide) {
-        req.flash("error", "Tartib topilmadi");
-
-        return res.redirect("/todos/create");
-      }
-
-      return Todo.create({ userId, guideId }).then(() => {
-        req.flash("success", "Bildirishnoma yaratildi");
-
-        res.redirect("/todos/list");
-      });
+      return res.redirect("/todos/create");
     }
-  );
+
+    if (!guide) {
+      req.flash("error", "Tartib topilmadi");
+
+      return res.redirect("/todos/create");
+    }
+
+    return Todo.create({ userId, guideId }).then(() => {
+      req.flash("success", "Bildirishnoma yaratildi");
+
+      res.redirect("/todos/list");
+    });
+  });
 }
 
 /**

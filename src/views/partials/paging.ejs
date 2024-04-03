@@ -1,0 +1,17 @@
+<nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+        <li class="page-item <%= !pageInfo.prev ? 'disabled' : '' %>">
+            <a class="page-link" href="<%= pageInfo.prev ? `?page=${pageInfo.prev}` : '#' %>">Previous</a>
+        </li>
+        <% pageInfo.pages.forEach(page=> { %>
+            <li class="page-item <%= page.label == pageInfo.current ? 'active' :'' %>"><a class="page-link"
+                    href="<%= page.url %>">
+                    <%= page.label %>
+                </a></li>
+            <% }) %>
+
+                <li class="page-item <%= !pageInfo.next ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= pageInfo.next ? `?page=${pageInfo.next}` : '' %>">Next</a>
+                </li>
+    </ul>
+</nav>
