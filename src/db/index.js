@@ -1,5 +1,12 @@
-const usersDb = require("./users-db");
-const guidesDb = require("./guides-db");
-const todosDb = require("./todos-db");
+const { Sequelize } = require("sequelize");
 
-module.exports = { usersDb, guidesDb, todosDb };
+const db = new Sequelize({
+  dialect: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "erp-guide-n6",
+  username: "postgres",
+  password: "1234",
+});
+
+module.exports = db;

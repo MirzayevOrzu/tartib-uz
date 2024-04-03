@@ -1,14 +1,12 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { usersDb } = require("../db");
+const User = require("../db/User");
 
 /**
  * @param {express.Request} req
  * @param {express.Response} res
  */
 function loginPage(req, res) {
-  console.log("flash", req.flash("error"));
-
   req.session.returnTo = "/login";
 
   res.render("auth/login", {
@@ -23,28 +21,27 @@ function loginPage(req, res) {
 function login(req, res) {
   const { username, password } = req.body;
 
-  const existing = usersDb.findByUsername(username);
+  return User.findOne({ where: { username } }).then((existing) => {
+    if (!existing) {
+      req.flash("error", "Login yoki parol xato");
 
-  if (!existing) {
-    req.flash("error", "Login yoki parol xato");
+      return res.redirect("/login");
+    }
 
-    return res.redirect("/login");
-  }
+    return bcrypt.compare(password, existing.password).then((match) => {
+      if (!match) {
+        req.flash("error", "Login yoki parol xato");
 
-  const match = bcrypt.compareSync(password, existing.password);
+        return res.redirect("/login");
+      }
 
-  if (!match) {
-    req.flash("error", "Login yoki parol xato");
+      req.session.user = existing;
 
-    return res.redirect("/login");
-  }
+      req.flash("success", "Xush kelibsiz!");
 
-  // sessionni boshlash
-  req.session.user = existing;
-
-  req.flash("success", "Xush kelibsiz!");
-
-  res.redirect("/");
+      res.redirect("/");
+    });
+  });
 }
 
 /**

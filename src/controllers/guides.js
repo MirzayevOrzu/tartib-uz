@@ -1,4 +1,6 @@
-const { guidesDb, usersDb, todosDb } = require("../db");
+const Guide = require("../db/Guide");
+const Todo = require("../db/Todo");
+const User = require("../db/User");
 
 /**
  * @param {express.Request} req
@@ -15,29 +17,30 @@ function createGuidePage(req, res) {
 function createGuide(req, res) {
   const { title, content, notify } = req.body;
 
-  const newGuide = guidesDb.create({ title, content });
+  Guide.create({ title, content }).then((newGuide) => {
+    if (notify) {
+      return User.findAll().then((users) => {
+        const newTodos = users.map((user) => {
+          return {
+            userId: user.dataValues.id,
+            guideId: newGuide.id,
+            completed: false,
+          };
+        });
 
-  if (notify) {
-    const users = usersDb.findAll();
+        return Todo.bulkCreate(newTodos).then(() => {
+          req.flash("success", "Bildirishnomalar hammaga jo'natildi");
+          req.flash("success", "Bildirishnomalar hammaga jo'natildi");
 
-    const newTodos = users.map((user) => {
-      return {
-        user_id: user.id,
-        guide_id: newGuide.id,
-        completed: false,
-      };
-    });
+          res.redirect("/guides/list");
+        });
+      });
+    }
 
-    todosDb.createBulk(newTodos);
-  }
+    req.flash("success", "Tartib muvaffaqiyatli yaratildi");
 
-  req.flash("success", "Tartib muvaffaqiyatli yaratildi");
-
-  if (notify) {
-    req.flash("success", "Bildirishnomalar hammaga jo'natildi");
-  }
-
-  res.redirect("/guides/list");
+    res.redirect("/guides/list");
+  });
 }
 
 /**
@@ -45,9 +48,9 @@ function createGuide(req, res) {
  * @param {express.Response} res
  */
 function listGuides(req, res) {
-  const guides = guidesDb.findAll();
-
-  res.render("guides/list", { guides });
+  return Guide.findAll().then((guides) => {
+    res.render("guides/list", { guides });
+  });
 }
 
 /**
@@ -55,18 +58,17 @@ function listGuides(req, res) {
  * @param {express.Response} res
  */
 function showGuide(req, res) {
-  console.log(req.params);
   const { id } = req.params;
 
-  const guide = guidesDb.findById(id);
+  return Guide.findByPk(id).then((guide) => {
+    if (!guide) {
+      req.flash("warning", "Tartib topilmadi");
 
-  if (!guide) {
-    req.flash("warning", "Tartib topilmadi");
+      return res.redirect("/guides/list");
+    }
 
-    return res.redirect("/guides/list");
-  }
-
-  res.render("guides/show", { guide });
+    res.render("guides/show", { guide });
+  });
 }
 
 /**
@@ -76,15 +78,15 @@ function showGuide(req, res) {
 function editGuidePage(req, res) {
   const { id } = req.params;
 
-  const guide = guidesDb.findById(id);
+  return Guide.findByPk(id).then((guide) => {
+    if (!guide) {
+      req.flash("warning", "Tartib topilmadi");
 
-  if (!guide) {
-    req.flash("warning", "Tartib topilmadi");
+      return res.redirect("/guides/list");
+    }
 
-    return res.redirect("/guides/list");
-  }
-
-  res.render("guides/edit", { guide });
+    res.render("guides/edit", { guide });
+  });
 }
 
 /**
@@ -95,39 +97,38 @@ function editGuide(req, res) {
   const { id } = req.params;
   const { title, content, notify } = req.body;
 
-  const guide = guidesDb.findById(id);
+  return Guide.findByPk(id).then((guide) => {
+    if (!guide) {
+      req.flash("error", "Tartib topilmadi");
 
-  if (!guide) {
-    req.flash("error", "Tartib topilmadi");
+      return res.redirect("/guides/list");
+    }
 
-    return res.redirect("/guides/list");
-  }
+    return guide.update({ title, content }).then((newGuide) => {
+      if (notify) {
+        return User.findAll().then((users) => {
+          const newTodos = users.map((user) => {
+            return {
+              userId: user.id,
+              guideId: newGuide.id,
+              completed: false,
+            };
+          });
 
-  guidesDb.update(id, { title, content });
+          return Todo.bulkCreate(newTodos).then(() => {
+            req.flash("success", "Bildirishnomalar hammaga jo'natildi");
+            req.flash("success", "Bildirishnomalar hammaga jo'natildi");
 
-  if (notify) {
-    const users = usersDb.findAll();
+            res.redirect("/guides/list");
+          });
+        });
+      }
 
-    const newTodos = users.map((user) => {
-      return {
-        user_id: user.id,
-        guide_id: id,
-        completed: false,
-      };
+      req.flash("success", "Tartib muvaffaqiyatli tahrirlandi");
+
+      res.redirect("/guides/list");
     });
-
-    todosDb.createBulk(newTodos);
-
-    console.log("boshqalarga yuborildi");
-  }
-
-  req.flash("success", "Tartib muvaffaqiyatli tahrirlandi");
-
-  if (notify) {
-    req.flash("success", "Bildirishnomalar hammaga jo'natildi");
-  }
-
-  res.redirect("/guides/list");
+  });
 }
 
 /**
@@ -137,19 +138,19 @@ function editGuide(req, res) {
 function removeGuide(req, res) {
   const { id } = req.params;
 
-  const guide = guidesDb.findById(id);
+  return Guide.findByPk(id).then((guide) => {
+    if (!guide) {
+      req.flash("error", "Tartib topilmadi");
 
-  if (!guide) {
-    req.flash("error", "Tartib topilmadi");
+      return res.redirect("/guides/list");
+    }
 
-    return res.redirect("/guides/list");
-  }
+    return guide.destroy().then(() => {
+      req.flash("success", "Tartib muvaffaqiyatli o'chirildi");
 
-  guidesDb.remove(id);
-
-  todosDb.removeAllOfGuide(id);
-
-  res.redirect("/guides/list");
+      res.redirect("/guides/list");
+    });
+  });
 }
 
 module.exports = {

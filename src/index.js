@@ -5,6 +5,7 @@ const expressEjsLayouts = require("express-ejs-layouts");
 const flash = require("connect-flash");
 const config = require("./shared/config");
 const routes = require("./routes");
+const db = require("./db");
 
 const app = express();
 
@@ -44,6 +45,14 @@ app.use((req, res) => {
   res.render("not-found", { layout: "layouts/auth" });
 });
 
-app.listen(config.port, () => {
-  console.log(`Listening on port ${config.port}`);
-});
+db.sync({ alter: true })
+  .then(() => {
+    console.log("DB connection is established");
+
+    app.listen(config.port, () => {
+      console.log(`Listening on port ${config.port}`);
+    });
+  })
+  .catch((err) => {
+    console.log("DB connection is failed: ", err);
+  });

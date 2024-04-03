@@ -1,6 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { usersDb, todosDb } = require("../db");
+const User = require("../db/User");
 
 /**
  * @param {express.Request} req
@@ -19,25 +19,46 @@ function createUser(req, res) {
   console.log(req.file);
   const { firstName, lastName, age, role, username, password } = req.body;
 
-  const existing = usersDb.findByUsername(username);
+  return User.findOne({ where: { username } })
+    .then((existing) => {
+      if (existing) {
+        req.flash("warning", `"${username}" username is used`);
+        return res.redirect("/users/create");
+      }
 
-  if (existing) {
-    console.log(`"${username}" username is used`);
-    return res.send(`"${username}" username is used`);
-  }
-
-  usersDb.create({
-    firstName,
-    lastName,
-    age,
-    role,
-    username,
-    password: bcrypt.hashSync(password, 10),
-    avatar: req.file?.filename,
-  });
-
-  req.flash("success", "Foydalanuvchi muvaffaqiyatli qo'shildi");
-  res.redirect("/users/list");
+      return bcrypt
+        .hash(password, 10)
+        .then((hashedPwd) => {
+          return User.create({
+            firstName,
+            lastName,
+            age,
+            role,
+            username,
+            password: hashedPwd,
+            avatar: req.file?.filename,
+          })
+            .then(() => {
+              req.flash("success", "Foydalanuvchi muvaffaqiyatli qo'shildi");
+              res.redirect("/users/list");
+            })
+            .catch((err) => {
+              console.log("error creating user: ", err);
+              res.flash("error", err.message);
+              res.redirect("/users/create");
+            });
+        })
+        .catch((err) => {
+          console.log("error hashing password: ", err);
+          res.flash("error", err.message);
+          res.redirect("/users/create");
+        });
+    })
+    .catch((err) => {
+      console.log("error finding user by username: ", err);
+      res.flash("error", err.message);
+      res.redirect("/users/create");
+    });
 }
 
 /**
@@ -45,8 +66,15 @@ function createUser(req, res) {
  * @param {express.Response} res
  */
 function listUsers(req, res) {
-  const users = usersDb.findAll();
-  res.render("users/list", { users });
+  return User.findAll({ order: [["createdAt", "DESC"]] })
+    .then((users) => {
+      res.render("users/list", { users });
+    })
+    .catch((err) => {
+      console.log("error finding all users: ", err);
+      req.flash("error", err.message);
+      res.redirect("/");
+    });
 }
 
 /**
@@ -56,14 +84,16 @@ function listUsers(req, res) {
 function showUser(req, res) {
   const { id } = req.params;
 
-  const user = usersDb.findById(id);
+  return User.findByPk(id).then((user) => {
+    console.log({ user });
 
-  if (!user) {
-    req.flash("warning", "Foydalanuvchi topilmadi");
-    return res.redirect("/users/list");
-  }
+    if (!user) {
+      req.flash("warning", "Foydalanuvchi topilmadi");
+      return res.redirect("/users/list");
+    }
 
-  res.render("users/show", { user });
+    res.render("users/show", { user });
+  });
 }
 
 /**
@@ -73,15 +103,17 @@ function showUser(req, res) {
 function editUserPage(req, res) {
   const { id } = req.params;
 
-  const user = usersDb.findById(id);
+  return User.findByPk(id).then((user) => {
+    console.log({ user });
 
-  if (!user) {
-    req.flash("warning", "Foydalanuvchi topilmadi");
-    return res.redirect("/users/list");
-  }
+    if (!user) {
+      req.flash("warning", "Foydalanuvchi topilmadi");
+      return res.redirect("/users/list");
+    }
 
-  req.session.returnTo = `/users/${id}/edit`;
-  res.render("users/edit", { user, profileEdit: false });
+    req.session.returnTo = `/users/${id}/edit`;
+    res.render("users/edit", { user, profileEdit: false });
+  });
 }
 
 /**
@@ -92,24 +124,39 @@ function editUser(req, res) {
   const { id } = req.params;
   const { firstName, lastName, age, role, username } = req.body;
 
-  const user = usersDb.findById(id);
+  return User.findByPk(id)
+    .then((user) => {
+      console.log({ user });
 
-  if (!user) {
-    req.flash("error", "Foydalanuvchi topilmadi");
-    return res.redirect("/users/list");
-  }
+      if (!user) {
+        req.flash("warning", "Foydalanuvchi topilmadi");
+        return res.redirect("/users/list");
+      }
 
-  usersDb.update(id, {
-    firstName,
-    lastName,
-    age,
-    role,
-    username,
-    avatar: req.file ? req.file.filename : user.avatar,
-  });
-
-  req.flash("success", "Foydalanuvchi muvaffaqiyatli tahrirlandi");
-  res.redirect("/users/list");
+      return user
+        .update({
+          firstName,
+          lastName,
+          age,
+          role,
+          username,
+          avatar: req.file ? req.file.filename : user.avatar,
+        })
+        .then(() => {
+          req.flash("success", "Foydalanuvchi muvaffaqiyatli tahrirlandi");
+          res.redirect("/users/list");
+        })
+        .catch((err) => {
+          console.log("error updating user: ", err);
+          req.flash("error", err.message);
+          res.redirect("/users/list");
+        });
+    })
+    .catch((err) => {
+      console.log("error finding user by id: ", err);
+      req.flash("error", err.message);
+      res.redirect("/users/list");
+    });
 }
 
 /**
@@ -119,18 +166,19 @@ function editUser(req, res) {
 function removeUser(req, res) {
   const { id } = req.params;
 
-  const user = usersDb.findById(id);
+  return User.findByPk(id).then((user) => {
+    console.log({ user });
 
-  if (!user) {
-    req.flash("error", "Foydalanuvchi topilmadi");
-    return res.redirect("/users/list");
-  }
+    if (!user) {
+      req.flash("warning", "Foydalanuvchi topilmadi");
+      return res.redirect("/users/list");
+    }
 
-  usersDb.remove(id);
-  todosDb.removeAllOfUser(id);
+    user.destroy();
 
-  req.flash("success", "Foydalanuvchi muvaffaqiyatli o'chirildi");
-  res.redirect("/users/list");
+    req.flash("success", "Foydalanuvchi muvaffaqiyatli o'chirildi");
+    res.redirect("/users/list");
+  });
 }
 
 /**
@@ -147,17 +195,17 @@ function userDashboard(req, res) {
  * @param {express.Response} res
  */
 function profilePage(req, res) {
-  const user = usersDb.findById(req.user.id);
+  return User.findByPk(req.user.id).then((user) => {
+    if (!user) {
+      req.flash("error", "Tizimdan o'chirilgansiz");
 
-  if (!user) {
-    req.flash("error", "Tizimdan o'chirilgansiz");
+      req.session.destroy();
 
-    req.session.destroy();
+      return res.redirect("/login");
+    }
 
-    return res.redirect("/login");
-  }
-
-  res.render("users/profile", { user });
+    res.render("users/profile", { user });
+  });
 }
 
 /**
@@ -165,17 +213,17 @@ function profilePage(req, res) {
  * @param {express.Response} res
  */
 function profileEditPage(req, res) {
-  const user = usersDb.findById(req.user.id);
+  return User.findByPk(req.user.id).then((user) => {
+    if (!user) {
+      req.flash("error", "Tizimdan o'chirilgansiz");
 
-  if (!user) {
-    req.flash("error", "Tizimdan o'chirilgansiz");
+      req.session.destroy();
 
-    req.session.destroy();
+      return res.redirect("/login");
+    }
 
-    return res.redirect("/login");
-  }
-
-  res.render("users/edit", { user, profileEdit: true });
+    res.render("users/edit", { user, profileEdit: true });
+  });
 }
 
 /**
@@ -183,29 +231,30 @@ function profileEditPage(req, res) {
  * @param {express.Response} res
  */
 function profileEdit(req, res) {
-  const userId = req.user.id;
   const { firstName, lastName, age, username } = req.body;
 
-  const user = usersDb.findById(userId);
+  return User.findByPk(req.user.id).then((user) => {
+    if (!user) {
+      req.flash("error", "Tizimdan o'chirilgansiz");
 
-  if (!user) {
-    req.flash("error", "Tizimdan o'chirilgansiz");
+      req.session.destroy();
 
-    req.session.destroy();
+      return res.redirect("/login");
+    }
 
-    return res.redirect("/login");
-  }
-
-  usersDb.update(userId, {
-    firstName,
-    lastName,
-    age,
-    username,
-    avatar: req.file ? req.file.filename : user.avatar,
+    return user
+      .update({
+        firstName,
+        lastName,
+        age,
+        username,
+        avatar: req.file ? req.file.filename : user.avatar,
+      })
+      .then(() => {
+        req.flash("success", "Foydalanuvchi muvaffaqiyatli tahrirlandi");
+        res.redirect("/users/list");
+      });
   });
-
-  req.flash("success", "Foydalanuvchi muvaffaqiyatli tahrirlandi");
-  res.redirect("/users/list");
 }
 
 module.exports = {
