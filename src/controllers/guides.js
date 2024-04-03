@@ -1,6 +1,10 @@
 const Guide = require("../db/Guide");
 const Todo = require("../db/Todo");
 const User = require("../db/User");
+const {
+  getPageOffsetAndLimit,
+  getPaginationLinks,
+} = require("../shared/paging");
 
 /**
  * @param {express.Request} req
@@ -48,8 +52,17 @@ function createGuide(req, res) {
  * @param {express.Response} res
  */
 function listGuides(req, res) {
-  return Guide.findAll().then((guides) => {
-    res.render("guides/list", { guides });
+  const page = +req.query.page || 1;
+  const { offset, limit } = getPageOffsetAndLimit(page, 5);
+
+  return Guide.findAndCountAll({
+    order: [["createdAt", "DESC"]],
+    offset,
+    limit,
+  }).then(({ rows: guides, count }) => {
+    const pageInfo = getPaginationLinks(page, count, 5);
+
+    res.render("guides/list", { guides, pageInfo });
   });
 }
 

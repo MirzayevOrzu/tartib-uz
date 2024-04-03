@@ -1,6 +1,10 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const User = require("../db/User");
+const {
+  getPageOffsetAndLimit,
+  getPaginationLinks,
+} = require("../shared/paging");
 
 /**
  * @param {express.Request} req
@@ -66,9 +70,20 @@ function createUser(req, res) {
  * @param {express.Response} res
  */
 function listUsers(req, res) {
-  return User.findAll({ order: [["createdAt", "DESC"]] })
-    .then((users) => {
-      res.render("users/list", { users });
+  const page = +req.query.page || 1;
+  const { offset, limit } = getPageOffsetAndLimit(page, 10);
+
+  return User.findAndCountAll({
+    order: [["createdAt", "DESC"]],
+    offset,
+    limit,
+  })
+    .then(({ rows: users, count }) => {
+      const pageInfo = getPaginationLinks(page, count, 10);
+
+      console.log({ pageInfo });
+
+      res.render("users/list", { users, pageInfo });
     })
     .catch((err) => {
       console.log("error finding all users: ", err);
