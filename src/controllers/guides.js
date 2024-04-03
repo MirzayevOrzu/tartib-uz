@@ -33,7 +33,7 @@ function createGuide(req, res) {
         });
 
         return Todo.bulkCreate(newTodos).then(() => {
-          req.flash("success", "Bildirishnomalar hammaga jo'natildi");
+          req.flash("success", "Tartib muvaffaqiyatli tahrirlandi");
           req.flash("success", "Bildirishnomalar hammaga jo'natildi");
 
           res.redirect("/guides/list");
@@ -129,7 +129,7 @@ function editGuide(req, res) {
           });
 
           return Todo.bulkCreate(newTodos).then(() => {
-            req.flash("success", "Bildirishnomalar hammaga jo'natildi");
+            req.flash("success", "Tartib muvaffaqiyatli tahrirlandi");
             req.flash("success", "Bildirishnomalar hammaga jo'natildi");
 
             res.redirect("/guides/list");
