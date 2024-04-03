@@ -8,6 +8,7 @@ const routes = require("./routes");
 const db = require("./db");
 
 const app = express();
+const SequelizeStore = require("connect-session-sequelize")(session.Store);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -27,6 +28,11 @@ app.use(
       httpOnly: true, // faqat http o'qiy oladi, javascript o'qiy olmaydi, xavfsizlik uchun
       maxAge: config.session.duration, // qancha vaqt session davom etsin
     },
+    store: new SequelizeStore({
+      db,
+      tableName: "sessions",
+      expiration: config.session.duration,
+    }),
   })
 );
 app.use(flash());
